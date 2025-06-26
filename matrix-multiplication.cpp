@@ -41,39 +41,6 @@ std::string device_type_to_string(sycl::info::device_type type) {
     }
 }
 
-// Function to perform matrix-matrix multiplication
-// void matrixMultiply(
-//     const std::vector<std::vector<int>>& A,
-//     const std::vector<std::vector<int>>& B,
-//     std::vector<std::vector<int>>& C) {
-
-//     // Get the dimensions of the matrices
-//     size_t rowsA = A.size();
-//     size_t colsA = A[0].size();
-//     size_t rowsB = B.size();
-//     size_t colsB = B[0].size();
-
-//     // Check if the matrices can be multiplied
-//     if (colsA != rowsB) {
-//         std::cerr << "Error: Number of columns in A must be equal to number of rows in B." << std::endl;
-//         return;
-//     }
-
-//     // Resize the result matrix C to the correct dimensions
-//     C.resize(rowsA, std::vector<int>(colsB, 0));
-
-//     // Perform matrix multiplication
-//     for (size_t i = 0; i < rowsA; ++i) {
-//         for (size_t j = 0; j < colsB; ++j) {
-//             for (size_t k = 0; k < colsA; ++k) {
-//                 C[i][j] += A[i][k] * B[k][j];
-//             }
-//         }
-//     }
-
-//     std::cout << "Matrix multiplication completed." << std::endl;
-// }
-
 void printMatrix(const int* matrix, int N, string matrixName){
     std::cout << "------ " << "Matrix " << matrixName << " ---" << std::endl;
     for (size_t i = 0; i < N; ++i) {
@@ -102,20 +69,6 @@ int main() {
     // auto selector = cpu_selector_v;
 #endif
 
-
-    auto devices = sycl::device::get_devices();
-
-    std::cout << "Available devices:" << std::endl;
-    for (const auto& device : devices) {
-        std::cout << "Device: " << device.get_info<sycl::info::device::name>() << std::endl;
-        std::cout << "  Vendor: " << device.get_info<sycl::info::device::vendor>() << std::endl;
-        std::cout << "  Type: " << device_type_to_string( device.get_info<sycl::info::device::device_type>() ) << std::endl;
-        // std::cout << "  Max Compute Units: " << device.get_info<sycl::info::device::max_compute_units>() << std::endl;
-        // std::cout << "  Global Memory Size: " << device.get_info<sycl::info::device::global_mem_size>() << " bytes" << std::endl;
-        // std::cout << "  Local Memory Size: " << device.get_info<sycl::info::device::local_mem_size>() << " bytes" << std::endl;
-        // std::cout << std::endl;
-    }
-
     // Create a SYCL queue to submit work
     queue q(selector, exception_handler);
 
@@ -137,7 +90,6 @@ int main() {
     std::mt19937 gen(rd()); // Seed the generator
     std::uniform_int_distribution<> distr(0, 100); // Define the range
 
-    // TODO: Parallelize this!!
     auto initStart = std::chrono::high_resolution_clock::now();
     // Initialize the matrix with random integers
     for (size_t i = 0; i < N; ++i) {
@@ -158,6 +110,10 @@ int main() {
 
     // Start timing
     auto operationStart = std::chrono::high_resolution_clock::now();
+
+	// Potential Optimizations:
+	// 1. split per worker
+	// 2. use device memory 
 
     // Submit a command group to the queue
     q.submit([&](handler& h) {
