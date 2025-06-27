@@ -43,25 +43,26 @@ std::string device_type_to_string(sycl::info::device_type type) {
 }
 
 void convolution(sycl::queue& q, const cv::Mat& input, cv::Mat& output, const std::vector<float>& filter, size_t filter_size) {
-
-    // Get image dimensions
+    // Get image dimensions and channels
     size_t width = input.cols;
     size_t height = input.rows;
+    size_t channels = input.channels();
 
     // Allocate shared memory for input, output, and filter
-    uchar* input_data = malloc_shared<uchar>(width * height, q);
-    uchar* output_data = malloc_shared<uchar>(width * height, q);
+    uchar* input_data = malloc_shared<uchar>(width * height * channels, q);
+    uchar* output_data = malloc_shared<uchar>(width * height * channels, q);
     float* filter_data = malloc_shared<float>(filter_size * filter_size, q);
 
     // Copy data to shared memory
-    std::memcpy(input_data, input.data, width * height);
+    std::memcpy(input_data, input.data, width * height * channels);
     std::copy(filter.begin(), filter.end(), filter_data);
 
     // Submit kernel to perform convolution
     q.submit([&](handler& h) {
-        h.parallel_for(range<2>(height, width), [=](id<2> idx) {
-            size_t x = idx[1];
+        h.parallel_for(range<3>(height, width, channels), [=](id<3> idx) {
             size_t y = idx[0];
+            size_t x = idx[1];
+            size_t c = idx[2];
             float sum = 0.0f;
 
             // Apply filter
@@ -72,20 +73,20 @@ void convolution(sycl::queue& q, const cv::Mat& input, cv::Mat& output, const st
 
                     // Check boundaries
                     if (x_offset >= 0 && x_offset < width && y_offset >= 0 && y_offset < height) {
-                        sum += input_data[y_offset * width + x_offset] * filter_data[i * filter_size + j];
+                        sum += input_data[(y_offset * width + x_offset) * channels + c] * filter_data[i * filter_size + j];
                     }
                 }
             }
 
             // Clamp the result to valid uchar range
-            output_data[y * width + x] = std::clamp(static_cast<int>(sum), 0, 255);
+            output_data[(y * width + x) * channels + c] = static_cast<uchar>(std::clamp(sum, 0.0f, 255.0f));
         });
     });
 
     q.wait();
 
     // Copy result back to output image
-    std::memcpy(output.data, output_data, width * height);
+    std::memcpy(output.data, output_data, width * height * channels);
 
     // Free allocated memory
     free(input_data, q);
@@ -104,17 +105,17 @@ std::vector<float> get_laplacian_filter() {
 
 std::vector<float> get_gaussian_blur() {
     return {
-        1/16, 1/8, 1/16,
-        1/8,  1/4, 1/8,
-        1/16, 1/8, 1/16
+        1/16.0f, 1/8.0f, 1/16.0f,
+        1/8.0f,  1/4.0f, 1/8.0f,
+        1/16.0f, 1/8.0f, 1/16.0f
     };
 }
 
 std::vector<float> get_average_filter() {
     return {
-        1/9, 1/9, 1/9,
-        1/9, 1/9, 1/9,
-        1/9, 1/9, 1/9
+        1/9.0f, 1/9.0f, 1/9.0f,
+        1/9.0f, 1/9.0f, 1/9.0f,
+        1/9.0f, 1/9.0f, 1/9.0f
     };
 }
 
@@ -167,8 +168,8 @@ int main() {
         << q.get_device().get_info<info::device::name>() << "\n";
 
     // Load the image using OpenCV
-    string input_name = "campNou";
-    // string input_name = "peter";
+    string input_name = "beach";
+    // cv::Mat input = cv::imread(input_name + ".jpg", cv::IMREAD_GRAYSCALE);
     cv::Mat input = cv::imread(input_name + ".jpg", cv::IMREAD_COLOR);
     if (input.empty()) {
         std::cerr << "Error: Could not open or find the image " << input_name << "!" << std::endl;
@@ -179,7 +180,10 @@ int main() {
     cv::Mat output(input.size(), input.type());
 
     std::vector<string> filter_names = {
-        "laplacian", "gaussian", "average", "sharpening"
+        "laplacian",
+        "gaussian",
+        "average",
+        "sharpening"
     };
 
     for (string filter_name : filter_names){
