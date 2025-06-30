@@ -168,7 +168,7 @@ int main() {
         << q.get_device().get_info<info::device::name>() << "\n";
 
     // Load the image using OpenCV
-    string input_name = "beach";
+    string input_name = "forest";
     // cv::Mat input = cv::imread(input_name + ".jpg", cv::IMREAD_GRAYSCALE);
     cv::Mat input = cv::imread(input_name + ".jpg", cv::IMREAD_COLOR);
     if (input.empty()) {
@@ -191,13 +191,18 @@ int main() {
         size_t filter_size = 3;
 
         // Perform convolution
+        auto initStart = std::chrono::high_resolution_clock::now();
         convolution(q, input, output, filter, filter_size);
+        auto initEnd = std::chrono::high_resolution_clock::now();
 
+        // Calculate the duration
+        std::chrono::duration<double> initDuration = initEnd - initStart;
+        std::cout << "Time taken for convolution using " << filter_name << " filter: " << initDuration.count() << " seconds" << std::endl;
         // Save the output image
         string output_name = input_name + "-" + filter_name + "-output.jpg";
         cv::imwrite(output_name, output);
 
-        std::cout << "Convolution completed and saved to " << output_name << "." << std::endl;
+        // std::cout << "Convolution completed and saved to " << output_name << "." << std::endl;
     }
 
     return 0;
